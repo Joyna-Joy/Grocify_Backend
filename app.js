@@ -6,6 +6,7 @@ const tipRouter=require("./Controllers/TipRouter");
 const recipeProductRouter=require("./Controllers/RecipeProductRouter");
 const nutritionRouter=require("./Controllers/NutritionRouter");
 const gorceryListRouter =require("./Controllers/GorceryListRouter");
+const userRouter=require('./Controllers/UserRouter');
 
 
 const app = express();
@@ -18,6 +19,9 @@ mongoose.connect("mongodb+srv://Joyna-Joy-24:Joyna24joy@cluster0.gj0szp5.mongodb
   .then(() => console.log('Connected to MongoDB'))
   .catch((error) => console.error('MongoDB connection error:', error));
 
+
+
+  app.use('/api/user',userRouter);
 
 
 //Routes For Recipe
