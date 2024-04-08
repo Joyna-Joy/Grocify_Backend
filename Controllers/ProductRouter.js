@@ -221,6 +221,42 @@ router.get('/get_cart/:id', async (req, res) => {
 });
 
 
+router.delete('/delete_item/:itemId', async (req, res) => {
+    try {
+        const { itemId } = req.params;
+        if (!itemId) {
+            return res.status(400).json({ message: "itemId is required" });
+        }
+
+        // Find the cart and the item to be removed
+        const cart = await Cart.findOne({ "cartItems._id": itemId });
+        if (!cart) {
+            return res.status(404).json({ message: "Cart Not Found" });
+        }
+
+        const removedItem = cart.cartItems.find(item => item._id.toString() === itemId);
+        if (!removedItem) {
+            return res.status(404).json({ message: "Item Not Found in Cart" });
+        }
+
+        // Calculate the difference in price
+        const itemPrice = removedItem.price * removedItem.quantity;
+
+        // Remove the item from cartItems array and update the total price
+        cart.cartItems.pull(itemId);
+        cart.totalPrice -= itemPrice;
+
+        // Save the updated cart
+        await cart.save();
+
+        res.status(200).json({ success: true });
+    } catch (error) {
+        console.error('Error deleting item from cart:', error);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+
 
 
 module.exports = router;
