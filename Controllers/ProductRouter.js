@@ -155,24 +155,31 @@ router.delete('/product/:productId/review/:id', async (req, res, next) => {
     }
 });
 
-router.get('product_category/:categoryIds', async (req, res, next) => {
+router.get('/product_category/:category_id', async (req, res, next) => {
     try {
         // Parse category IDs from URL parameters
-        const categoryIds = req.params.categoryIds.split(',');
+        const category_id = req.params.category_id.split(',');
+
+        // Log category IDs for debugging
+        console.log('Category IDs:', category_id);
 
         // Find products that belong to any of the specified categories
-        const products = await Product.find({ category: { $in: categoryIds } });
+        const products = await Product.find({ category: { $in: category_id } });
 
         // Check if any products were found
         if (products.length === 0) {
             return res.status(404).json({ success: false, message: "No products found for the specified categories" });
         }
 
+        // Return products if found
         res.status(200).json({ success: true, products });
     } catch (error) {
+        // Log error if any
+        console.error('Error fetching products by category:', error);
         res.status(500).json({ success: false, message: "Failed to fetch products by category" });
     }
 });
+
 
 
 router.post('/add_cart', async (req, res) => {
