@@ -10,6 +10,7 @@ const userRouter=require('./Controllers/UserRouter');
 const productRouter=require('./Controllers/ProductRouter');
 const categoryRouter=require("./Controllers/categoryRouter");
 const staffRouter = require('./Controllers/StaffRouter');
+const orderRouter = require('./Controllers/OrderRouter')
 
 
 const app = express();
@@ -28,6 +29,7 @@ mongoose.connect("mongodb+srv://Joyna-Joy-24:Joyna24joy@cluster0.gj0szp5.mongodb
   app.use('/api/product',productRouter);
   app.use("/api/category",categoryRouter);
   app.use('/api/staff', staffRouter);
+  app.use('/api/order', orderRouter);
 
 
 
