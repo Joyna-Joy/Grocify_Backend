@@ -1,191 +1,128 @@
-const express = require("express");
-const router = express.Router();
-const  Product = require("../Models/ProductModel");
-const SearchFeatures = require('../utils/searchFeatures');
-const Cart = require("../Models/CartModel")
+const express=require("express")
+const router=express.Router()
+const productModel=require("../Models/ProductModel")
+const Cart=require("../Models/CartModel")
 
-// Get All Products
-router.get('/Viewproducts', async (req, res, next) => {
-    const resultPerPage = 12;
-    const productsCount = await Product.countDocuments();
-    const searchFeature = new SearchFeatures(Product.find(), req.query)
-        .search()
-        .filter();
-
-    let products = await searchFeature.query;
-    let filteredProductsCount = products.length;
-
-    searchFeature.pagination(resultPerPage);
-
-    products = await searchFeature.query.clone();
-
-    res.status(200).json({
-        success: true,
-        products,
-        productsCount,
-        resultPerPage,
-        filteredProductsCount,
-    });
-});
-
-// Get Product Details
-router.get('/getproduct/:id', async (req, res, next) => {
-    const product = await Product.findById(req.params.id);
-
-    if (!product) {
-        return res.status(404).json({ success: false, message: "Product Not Found" });
-    }
-
-    res.status(200).json({
-        success: true,
-        product,
-    });
-});
-
-// Get All Products (Product Sliders)
-router.get('/sliders', async (req, res, next) => {
-    const products = await Product.find();
-
-    res.status(200).json({
-        success: true,
-        products,
-    });
-});
-
-// Create Product
-router.post('/addProduct', async (req, res, next) => {
+router.post('/product_upload', async (req, res) => {
     try {
-        const product = await Product.create(req.body);
-        res.status(201).json({ success: true, product });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to create product" });
-    }
-});
-
-// Update Product
-router.put('/Updateproduct/:id', async (req, res, next) => {
-    try {
-        const product = await Product.findByIdAndUpdate(req.params.id, req.body, {
-            new: true,
-            runValidators: true
+        const discount = req.body.discount;
+        const price = req.body.price;
+        const discount_price = calculateDiscountPrice(price, discount);
+        
+        const newProduct = new productModel({
+            product_name: req.body.product_name,
+            price: req.body.price,
+            discount: req.body.discount,
+            discount_price: discount_price,
+            short_desc: req.body.short_desc,
+            long_desc: req.body.long_desc,
+            vendor_id: req.body.vendor_id,
+            category_id: req.body.category_id,
+            product_img: req.body.product_img // Assuming product_img contains the image URL
         });
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found" });
-        }
-        res.status(200).json({ success: true, product });
+
+        await newProduct.save();
+        res.send("Successfully uploaded");
     } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to update product" });
+        console.log(error);
+        res.status(500).json({ message: "Failed to upload product" });
     }
 });
 
-// Delete Product
-router.delete('/Deleteproduct/:id', async (req, res, next) => {
-    try {
-        const product = await Product.findByIdAndDelete(req.params.id);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found" });
-        }
-        res.status(200).json({ success: true, message: "Product deleted successfully" });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to delete product" });
-    }
+router.get("/viewproduct",async(req,res)=>{
+    let result=await productModel.find()
+    res.json(result)
 });
 
-router.get('/search_products', async (req, res) => {
-    try {
-        const { query } = req.query;
-        if (!query) {
-            return res.status(400).json({ message: 'Search query is required' });
+router.get('/product_category', async(req,res)=>{
+    let category_id=req.query.category_id
+    let data=await productModel.find({"category_id":category_id});
+    if(!data)
+    {
+        return res.json({
+            status: "No products"
+        })
+    }
+    res.json(data)
+});
+
+router.get('/product_details',async(req,res)=>{
+    let product_id=req.query.productId
+    let data=await productModel.findById(product_id)
+    .populate('vendor_id', 'company_name email ');
+    if(!data)
+    {
+        return res.json({
+            status: "No products"
+        })
+    }
+    res.json(data)
+});
+
+router.get('/search_products',async(req,res)=>{
+    let search=req.query.search
+    let data= await productModel.find({"product_name":{ $regex:".*"+search+".*",$options:'i'}});
+    if(!data)
+    {
+        return res.json({
+            status: "No products"
+        })
+    }
+    res.json(data)
+});
+
+
+function calculateDiscountPrice(price, discount) {
+    const discountedAmount = (parseInt(price) * (parseInt(discount) / 100));
+    return (parseInt(price) - discountedAmount).toString();
+}
+
+router.put('/update_product', (req, res) => {
+    // Extract product ID from request query
+    const productId = req.query.id;
+
+    // Extract other product details from request body
+    const {
+        product_name,
+        price,
+        discount,
+        discount_price,
+        short_desc,
+        long_desc,
+        vendor_id,
+        category_id,
+        product_img // Assuming product_img contains the image URL
+    } = req.body;
+
+    // Update the product in the database
+    productModel.findByIdAndUpdate(productId, {
+        product_name,
+        price,
+        discount,
+        discount_price,
+        short_desc,
+        long_desc,
+        vendor_id,
+        category_id,
+        product_img
+    }, { new: true })
+    .then((updatedProduct) => {
+        if (!updatedProduct) {
+            return res.status(404).json({ message: 'Product not found' });
         }
-        // Perform a case-insensitive search for products whose names contain the search query
-        const products = await Product.find({ name: { $regex: query, $options: 'i' } });
-        res.json(products);
-    } catch (error) {
-        console.error('Error searching products:', error);
+        res.status(200).json(updatedProduct);
+    })
+    .catch((error) => {
+        console.error('Error updating product:', error.message);
         res.status(500).json({ message: 'Internal server error' });
-    }
+    });
 });
-
-
-// Create or Update Reviews
-router.post('/reviewsProduct/:id', async (req, res, next) => {
-    try {
-        const product = await Product.findById(req.params.id);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found" });
-        }
-
-        // Implementation of creating or updating reviews for a product
-        // For simplicity, assume reviews are added directly to the product
-        product.reviews.push(req.body);
-        await product.save();
-
-        res.status(200).json({ success: true, product });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to add or update review" });
-    }
-});
-
-// Get All Reviews of a Product
-router.get('/reviewsProduct/:id', async (req, res, next) => {
-    try {
-        const product = await Product.findById(req.params.id);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found" });
-        }
-        const reviews = product.reviews;
-        res.status(200).json({ success: true, reviews });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to fetch reviews" });
-    }
-});
-
-// Delete Review
-router.delete('/product/:productId/review/:id', async (req, res, next) => {
-    try {
-        const product = await Product.findById(req.params.productId);
-        if (!product) {
-            return res.status(404).json({ success: false, message: "Product not found" });
-        }
-        product.reviews = product.reviews.filter(review => review._id.toString() !== req.params.id);
-        await product.save();
-        res.status(200).json({ success: true, message: "Review deleted successfully" });
-    } catch (error) {
-        res.status(500).json({ success: false, message: "Failed to delete review" });
-    }
-});
-
-router.get('/product_category/:category_id', async (req, res, next) => {
-    try {
-        // Parse category IDs from URL parameters
-        const category_id = req.params.category_id.split(',');
-
-        // Log category IDs for debugging
-        console.log('Category IDs:', category_id);
-
-        // Find products that belong to any of the specified categories
-        const products = await Product.find({ category: { $in: category_id } });
-
-        // Check if any products were found
-        if (products.length === 0) {
-            return res.status(404).json({ success: false, message: "No products found for the specified categories" });
-        }
-
-        // Return products if found
-        res.status(200).json({ success: true, products });
-    } catch (error) {
-        // Log error if any
-        console.error('Error fetching products by category:', error);
-        res.status(500).json({ success: false, message: "Failed to fetch products by category" });
-    }
-});
-
 
 
 router.post('/add_cart', async (req, res) => {
     try {
         const { user_id, product_id, quantity } = req.body;
-        const product = await Product.findById(product_id);
+        const product = await productModel.findById(product_id);
         if (!product) {
             return res.status(404).json({ message: 'Product not found' });
         }
@@ -221,45 +158,49 @@ router.get('/get_cart/:id', async (req, res) => {
 });
 
 
-router.delete('/delete_item/:itemId', async (req, res) => {
+router.put('/update_cart_qty', async (req, res) => {
+    const user_id = req.query.user_id;
+    const { product_id, quantity } = req.body;
+    if (!quantity || !product_id) {
+        return res.status(400).json({ error: 'Quantity and product ID are required' });
+    }
     try {
-        const { itemId } = req.params;
-        if (!itemId) {
-            return res.status(400).json({ message: "itemId is required" });
-        }
-
-        // Find the cart and the item to be removed
-        const cart = await Cart.findOne({ "cartItems._id": itemId });
+        let cart = await Cart.findOne({ "user_id": user_id });
         if (!cart) {
-            return res.status(404).json({ message: "Cart Not Found" });
+            return res.status(404).json({ error: 'Cart not found' });
         }
-
-        const removedItem = cart.cartItems.find(item => item._id.toString() === itemId);
-        if (!removedItem) {
-            return res.status(404).json({ message: "Item Not Found in Cart" });
+        let itemIndex = cart.cartItems.findIndex(item => item.product_id.toString() === product_id);
+        if (itemIndex === -1) {
+            return res.status(404).json({ error: 'Product not found in cart' });
         }
-
-        // Calculate the difference in price
-        const itemPrice = removedItem.price * removedItem.quantity;
-
-        // Remove the item from cartItems array and update the total price
-        cart.cartItems.pull(itemId);
-        cart.totalPrice -= itemPrice;
-
-        // Save the updated cart
+        cart.cartItems[itemIndex].quantity = quantity;
         await cart.save();
-
-        res.status(200).json({ success: true });
+        res.status(200).json({ message: 'Quantity updated successfully', cart });
     } catch (error) {
-        console.error('Error deleting item from cart:', error);
+        console.error('Error updating cart:', error);
         res.status(500).json({ message: 'Internal server error' });
     }
 });
 
+router.delete("/delete_cart", async (req, res) => {
+    const user_id = req.query.user_id;
+
+    try {
+        // Delete the cart item by user_id
+        const deletedCart = await Cart.findOneAndDelete({ "user_id": user_id });
+
+        // Check if the cart was deleted
+        if (!deletedCart) {
+            return res.status(404).json({ message: "Cart not found" });
+        }
+
+        // Send success response
+        res.status(200).json({ message: "Cart deleted successfully" });
+    } catch (error) {
+        console.error("Error deleting cart:", error);
+        res.status(500).json({ message: "Internal server error" });
+    }
+});
 
 
-
-module.exports = router;
-
-
-
+module.exports=router
